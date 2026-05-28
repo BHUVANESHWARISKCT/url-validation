@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL Status Monitor — AI Agent</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #1a1d24;
+    --surface3: #22262f;
+    --border: #2a2f3a;
+    --text: #e8eaf0;
+    --text-dim: #7a8099;
+    --text-dimmer: #454d66;
+    --accent: #00d4aa;
+    --accent2: #0066ff;
+    --green: #00c87a;
+    --red: #ff4560;
+    --yellow: #ffb830;
+    --blue: #4488ff;
+    --purple: #9966ff;
+    --glow: rgba(0, 212, 170, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px;
+    right: -200px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(0,212,170,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px 60px;
+  }
+
+  header {
+    padding: 32px 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .logo { display: flex; align-items: center; gap: 14px; }
+
+  .logo-icon {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 20px var(--glow);
+  }
+
+  .logo-text h1 {
+    font-size: 22px; font-weight: 800; letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--text) 60%, var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  .logo-text span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
+  }
+
+  .header-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--accent);
+    border: 1px solid rgba(0,212,170,0.3);
+    padding: 6px 14px; border-radius: 20px;
+    background: rgba(0,212,170,0.05);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .pulse-dot {
+    width: 7px; height: 7px;
+    background: var(--accent); border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .instructions {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 32px;
+    display: flex; gap: 32px; align-items: center;
+  }
+
+  .instructions-title {
+    font-size: 12px; font-weight: 700; color: var(--accent);
+    letter-spacing: 2px; text-transform: uppercase; white-space: nowrap; margin-bottom: 6px;
+  }
+
+  .steps { display: flex; gap: 0; flex: 1; }
+
+  .step { display: flex; align-items: center; gap: 10px; flex: 1; }
+
+  .step:not(:last-child)::after {
+    content: '→'; color: var(--text-dimmer); font-size: 14px; margin: 0 8px; flex-shrink: 0;
+  }
+
+  .step-num {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+    color: var(--bg); flex-shrink: 0;
+  }
+
+  .step-text { font-size: 13px; color: var(--text-dim); line-height: 1.3; }
+
+  .main-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px;
+  }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .instructions { flex-direction: column; }
+    .steps { flex-direction: column; gap: 12px; }
+    .step::after { display: none; }
+  }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; transition: border-color 0.3s;
+  }
+
+  .card:hover { border-color: rgba(0,212,170,0.2); }
+
+  .card-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .card-title::before {
+    content: ''; width: 3px; height: 14px;
+    background: var(--accent); border-radius: 2px;
+  }
+
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 40px 24px; text-align: center; cursor: pointer;
+    transition: all 0.3s; position: relative; overflow: hidden;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent); background: rgba(0,212,170,0.04);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .upload-icon { font-size: 36px; margin-bottom: 12px; display: block; }
+  .upload-text { font-size: 14px; color: var(--text-dim); margin-bottom: 6px; }
+  .upload-sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dimmer); }
+
+  .file-loaded {
+    margin-top: 16px;
+    background: rgba(0,200,122,0.1); border: 1px solid rgba(0,200,122,0.3);
+    border-radius: 8px; padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--green);
+    display: none; text-align: left;
+  }
+
+  .url-textarea {
+    width: 100%; height: 140px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    resize: vertical; outline: none; transition: border-color 0.2s; line-height: 1.6;
+  }
+
+  .url-textarea:focus { border-color: var(--accent); }
+  .url-textarea::placeholder { color: var(--text-dimmer); }
+  .textarea-hint { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dimmer); margin-top: 8px; }
+
+  .config-row { display: flex; gap: 16px; margin-bottom: 28px; align-items: flex-end; }
+  .config-group { flex: 1; }
+
+  .config-label {
+    font-size: 11px; font-weight: 600; color: var(--text-dim);
+    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; display: block;
+  }
+
+  .config-input, .config-select {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; color: var(--text);
+    font-family: 'Syne', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s;
+  }
+
+  .config-input:focus, .config-select:focus { border-color: var(--accent); }
+  .config-select option { background: var(--surface2); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 24px; border-radius: 10px;
+    font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: none; transition: all 0.2s; white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #00b894);
+    color: var(--bg); box-shadow: 0 4px 20px rgba(0,212,170,0.25);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px); box-shadow: 0 6px 28px rgba(0,212,170,0.35);
+  }
+
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-download {
+    background: linear-gradient(135deg, var(--accent2), var(--purple));
+    color: white; box-shadow: 0 4px 20px rgba(0,102,255,0.25); display: none;
+  }
+
+  .btn-download:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(0,102,255,0.35); }
+
+  .btn-stop {
+    background: rgba(255,69,96,0.15); color: var(--red);
+    border: 1px solid rgba(255,69,96,0.3); display: none;
+  }
+
+  .btn-stop:hover { background: rgba(255,69,96,0.25); }
+
+  .actions-row {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; align-items: center;
+  }
+
+  .progress-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; margin-bottom: 28px; display: none;
+  }
+
+  .progress-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+  }
+
+  .progress-label { font-size: 13px; font-weight: 600; color: var(--text-dim); }
+  .progress-pct { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--accent); }
+
+  .progress-bar-wrap { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin-bottom: 14px; }
+
+  .progress-bar-fill {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 4px; width: 0%; transition: width 0.3s ease; position: relative;
+  }
+
+  .progress-bar-fill::after {
+    content: ''; position: absolute; top: 0; right: 0; width: 40px; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+
+  .progress-stats { display: flex; gap: 24px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .progress-stat { display: flex; align-items: center; gap: 6px; }
+  .progress-stat span { color: var(--text-dimmer); }
+  .progress-stat strong { color: var(--text); }
+
+  .current-url {
+    margin-top: 12px; padding: 10px 14px; background: var(--surface2);
+    border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .current-url::before { content: '⟩ '; color: var(--accent); }
+
+  .dashboard {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 28px;
+  }
+
+  @media (max-width: 900px) { .dashboard { grid-template-columns: repeat(2, 1fr); } }
+
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; text-align: center; transition: all 0.3s;
+  }
+
+  .stat-card:hover { transform: translateY(-2px); }
+
+  .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+  .stat-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dimmer); }
+
+  .stat-total .stat-value { color: var(--text); }
+  .stat-working .stat-value { color: var(--green); }
+  .stat-working { border-color: rgba(0,200,122,0.2); }
+  .stat-failed .stat-value { color: var(--red); }
+  .stat-failed { border-color: rgba(255,69,96,0.2); }
+  .stat-timeout .stat-value { color: var(--yellow); }
+  .stat-timeout { border-color: rgba(255,184,48,0.2); }
+  .stat-other .stat-value { color: var(--blue); }
+
+  .results-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden; display: none;
+  }
+
+  .results-header {
+    padding: 20px 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .results-title { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+  .results-filter { display: flex; gap: 8px; }
+
+  .filter-btn {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-dim); cursor: pointer; transition: all 0.2s;
+  }
+
+  .filter-btn:hover, .filter-btn.active {
+    background: var(--accent); border-color: var(--accent); color: var(--bg);
+  }
+
+  .table-scroll { overflow-x: auto; max-height: 480px; overflow-y: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  thead { position: sticky; top: 0; z-index: 5; }
+
+  thead th {
+    background: var(--surface2); padding: 12px 16px; text-align: left;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--text-dimmer);
+    white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr { border-bottom: 1px solid rgba(42,47,58,0.5); transition: background 0.15s; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+  tbody td {
+    padding: 12px 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--text-dim); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .td-url { max-width: 220px; color: var(--text); }
+  .td-name { color: var(--text); font-weight: 500; }
+
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+
+  .status-working   { background: rgba(0,200,122,0.15);  color: var(--green);  border: 1px solid rgba(0,200,122,0.25); }
+  .status-reachable { background: rgba(0,200,122,0.15);  color: var(--green);  border: 1px solid rgba(0,200,122,0.25); }
+  .status-timeout   { background: rgba(255,184,48,0.15); color: var(--yellow); border: 1px solid rgba(255,184,48,0.25); }
+  .status-ssl-error { background: rgba(255,150,0,0.15);  color: #ffaa00;       border: 1px solid rgba(255,150,0,0.25); }
+  .status-dns-error { background: rgba(153,102,255,0.15);color: var(--purple); border: 1px solid rgba(153,102,255,0.25); }
+  .status-down, .status-failed, .status-error { background: rgba(255,69,96,0.15); color: var(--red); border: 1px solid rgba(255,69,96,0.25); }
+  .status-checking  { background: rgba(0,212,170,0.1);   color: var(--accent); border: 1px solid rgba(0,212,170,0.2); }
+  .status-redirect  { background: rgba(255,184,48,0.15); color: var(--yellow); border: 1px solid rgba(255,184,48,0.25); }
+
+  .http-code { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .code-2xx { color: var(--green); }
+  .code-3xx { color: var(--yellow); }
+  .code-4xx { color: #ff9900; }
+  .code-5xx { color: var(--red); }
+  .code-0   { color: var(--text-dimmer); }
+
+  .response-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .time-fast   { color: var(--green); }
+  .time-medium { color: var(--yellow); }
+  .time-slow   { color: var(--red); }
+
+  .row-working  { background: rgba(0,200,122,0.03); }
+  .row-failed   { background: rgba(255,69,96,0.03); }
+  .row-timeout  { background: rgba(255,184,48,0.03); }
+  .row-redirect { background: rgba(255,184,48,0.03); }
+
+  .log-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden; margin-top: 28px; display: none;
+  }
+
+  .log-header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .log-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); letter-spacing: 1px; }
+
+  #log-container { height: 160px; overflow-y: auto; padding: 12px 20px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.7; }
+
+  .log-line  { display: block; }
+  .log-ok    { color: var(--green); }
+  .log-err   { color: var(--red); }
+  .log-warn  { color: var(--yellow); }
+  .log-info  { color: var(--text-dimmer); }
+  .log-time  { color: var(--text-dimmer); margin-right: 10px; }
+
+  .empty-state { text-align: center; padding: 60px 24px; color: var(--text-dimmer); font-size: 13px; }
+  .empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+
+  .toast {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 20px; font-size: 13px; color: var(--text);
+    z-index: 100; transform: translateY(80px); opacity: 0; transition: all 0.3s; max-width: 340px;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: rgba(0,200,122,0.4); color: var(--green); }
+  .toast.error   { border-color: rgba(255,69,96,0.4); color: var(--red); }
+  .toast.warning { border-color: rgba(255,184,48,0.4); color: var(--yellow); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface2); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dimmer); }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .spinning { animation: spin 1s linear infinite; display: inline-block; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🔍</div>
+      <div class="logo-text">
+        <h1>URL Status Monitor</h1>
+        <span>AI Agent v3.0 — Standalone</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);border:1px solid rgba(0,212,170,0.2);padding:5px 10px;border-radius:8px;">
+        ✦ Browser-Only · No Backend
+      </span>
+      <div class="header-badge">
+        <div class="pulse-dot"></div>
+        AGENT READY
+      </div>
+    </div>
+  </header>
+
+  <div class="instructions">
+    <div><div class="instructions-title">Quick Start</div></div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">Upload Excel / CSV<br>or paste URLs</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">Configure timeout<br>&amp; concurrency</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">Click<br><strong>Start Checking</strong></div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">Download<br>Excel Report</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="card">
+      <div class="card-title">Upload Excel / CSV</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv" />
+        <span class="upload-icon">📊</span>
+        <div class="upload-text">Drop your file here or click to browse</div>
+        <div class="upload-sub">Supports .xlsx, .xls, .csv — Columns: CL Name, Near Zone Name, URL</div>
+      </div>
+      <div class="file-loaded" id="file-loaded">
+        ✓ File loaded: <span id="file-name"></span> — <span id="file-rows"></span> URLs found
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="downloadSampleExcel()" style="font-size:12px;padding:9px 16px;">
+          ⬇ Download Sample Excel
+        </button>
+        <button class="btn btn-secondary" onclick="clearFile()" style="font-size:12px;padding:9px 16px;">
+          ✕ Clear
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Paste URLs Directly</div>
+      <textarea class="url-textarea" id="url-textarea" placeholder="https://example.com&#10;https://google.com&#10;https://github.com&#10;&#10;One URL per line. These will be added to the check queue."></textarea>
+      <div class="textarea-hint">💡 One URL per line. Combined with Excel data. Cloudflare-protected URLs handled intelligently.</div>
+    </div>
+  </div>
+
+  <div class="config-row">
+    <div class="config-group">
+      <label class="config-label">Timeout (seconds)</label>
+      <input type="number" class="config-input" id="timeout-input" value="15" min="5" max="60" />
+    </div>
+    <div class="config-group">
+      <label class="config-label">Concurrent Checks</label>
+      <select class="config-select" id="concurrency-select">
+        <option value="1">1 — Sequential</option>
+        <option value="3" selected>3 — Balanced</option>
+        <option value="5">5 — Fast</option>
+        <option value="8">8 — Maximum</option>
+      </select>
+    </div>
+    <div class="config-group">
+      <label class="config-label">Max Retries</label>
+      <select class="config-select" id="retry-select">
+        <option value="1">1 — Quick</option>
+        <option value="2" selected>2 — Standard</option>
+        <option value="3">3 — Thorough</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="actions-row">
+    <button class="btn btn-primary" id="start-btn" onclick="startChecking()">
+      ▶ Start Checking
+    </button>
+    <button class="btn btn-stop" id="stop-btn" onclick="stopChecking()">
+      ■ Stop
+    </button>
+    <button class="btn btn-download" id="download-btn" onclick="downloadReport()">
+      ⬇ Download Excel Report
+    </button>
+    <button class="btn btn-secondary" onclick="clearAll()" style="font-size:12px;padding:11px 18px;">
+      ↺ Clear All
+    </button>
+    <span id="status-text" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dimmer);margin-left:8px;"></span>
+  </div>
+
+  <div class="progress-section" id="progress-section">
+    <div class="progress-header">
+      <div class="progress-label">Checking URLs...</div>
+      <div class="progress-pct" id="progress-pct">0%</div>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-bar"></div>
+    </div>
+    <div class="progress-stats">
+      <div class="progress-stat"><span>Total:</span><strong id="stat-total">0</strong></div>
+      <div class="progress-stat"><span>Done:</span><strong id="stat-done">0</strong></div>
+      <div class="progress-stat"><span>✓</span><strong id="stat-ok" style="color:var(--green)">0</strong></div>
+      <div class="progress-stat"><span>✗</span><strong id="stat-fail" style="color:var(--red)">0</strong></div>
+      <div class="progress-stat"><span>⏱</span><strong id="stat-slow" style="color:var(--yellow)">0</strong></div>
+      <div class="progress-stat"><span>↪</span><strong id="stat-redirect" style="color:var(--yellow)">0</strong></div>
+      <div class="progress-stat"><span>ETA:</span><strong id="stat-eta">—</strong></div>
+    </div>
+    <div class="current-url" id="current-url">Initializing...</div>
+  </div>
+
+  <div class="dashboard">
+    <div class="stat-card stat-total">
+      <div class="stat-value" id="dash-total">0</div>
+      <div class="stat-label">Total URLs</div>
+    </div>
+    <div class="stat-card stat-working">
+      <div class="stat-value" id="dash-working">0</div>
+      <div class="stat-label">Working</div>
+    </div>
+    <div class="stat-card stat-failed">
+      <div class="stat-value" id="dash-failed">0</div>
+      <div class="stat-label">Failed / Down</div>
+    </div>
+    <div class="stat-card stat-timeout">
+      <div class="stat-value" id="dash-timeout">0</div>
+      <div class="stat-label">Timeout</div>
+    </div>
+    <div class="stat-card stat-other">
+      <div class="stat-value" id="dash-other">0</div>
+      <div class="stat-label">Redirect / SSL / DNS</div>
+    </div>
+  </div>
+
+  <div class="results-section" id="results-section">
+    <div class="results-header">
+      <div class="results-title">📋 Results</div>
+      <div class="results-filter">
+        <button class="filter-btn active" onclick="filterTable('all', this)">All</button>
+        <button class="filter-btn" onclick="filterTable('working', this)">✓ Working</button>
+        <button class="filter-btn" onclick="filterTable('failed', this)">✗ Failed</button>
+        <button class="filter-btn" onclick="filterTable('timeout', this)">⏱ Timeout</button>
+        <button class="filter-btn" onclick="filterTable('redirect', this)">↪ Redirect</button>
+        <button class="filter-btn" onclick="filterTable('error', this)">⚠ Errors</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>CL Name</th>
+            <th>Near Zone Name</th>
+            <th>URL</th>
+            <th>Status</th>
+            <th>HTTP Code</th>
+            <th>Response Time</th>
+            <th>Details</th>
+            <th>Health</th>
+            <th>Checked At</th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody">
+          <tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">📡</div>No results yet. Upload a file or paste URLs and click Start Checking.</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="log-section" id="log-section">
+    <div class="log-header">
+      <div class="log-title">▸ AGENT LOG</div>
+      <button class="btn btn-secondary" onclick="clearLog()" style="font-size:11px;padding:5px 12px;">Clear</button>
+    </div>
+    <div id="log-container"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let urlQueue   = [];
+let results    = [];
+let isRunning  = false;
+let shouldStop = false;
+let startTime  = null;
+
+// ═══════════════════════════════════════════════════════════
+// SMART URL CLASSIFICATION ENGINE
+// ═══════════════════════════════════════════════════════════
+
+// Cloudflare signature HTTP codes — these mean the ORIGIN is protected, NOT down
+// CF returns 403, 429, 503 with WAF/challenge pages when blocking bots
+const CF_SIGNATURE_CODES = new Set([403, 429, 503]);
+
+// Status codes that definitively mean the server is UP and responding
+// 200-403 range: server received request and gave a valid HTTP response
+const WORKING_CODES = new Set([
+  200, 201, 202, 203, 204, 205, 206,
+  301, 302, 303, 304, 307, 308,
+  400, 401, 403
+]);
+
+// Status codes that indicate redirect (track separately)
+const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
+
+// Definitive DOWN signals — resource explicitly missing/server failed
+const DOWN_CODES = new Set([
+  404, 410,           // Resource gone
+  500, 502, 503, 504, // Server errors (UNLESS Cloudflare pattern)
+  520, 521, 522, 523, 524, 525, 526, // CF origin errors
+  530                 // CF error
+]);
+
+// Cloudflare-specific user agent and detection patterns
+const CF_DETECT_PATTERNS = [
+  /cloudflare/i, /cf-ray/i, /__cfduid/i, /cf_clearance/i
+];
+
+// Domains/patterns known to be enterprise/internal — more lenient timeouts
+const ENTERPRISE_PATTERNS = [
+  /\.internal\./i, /\.corp\./i, /\.intranet\./i, /\.local$/i,
+  /portal\./i, /admin\./i, /dashboard\./i, /app\./i,
+  /vpn\./i, /extranet\./i, /jdadelivers/i, /\.enterprise\./i
+];
+
+function isEnterpriseDomain(url) {
+  try {
+    const { hostname } = new URL(url);
+    return ENTERPRISE_PATTERNS.some(p => p.test(hostname) || p.test(url));
+  } catch { return false; }
+}
+
+// Primary status classifier — heart of the validation logic
+function classifyResult({ httpCode, opaque, error, isCloudflare, isRedirect }) {
+  // Opaque responses from no-cors = server definitely responded
+  if (opaque) return 'Working';
+
+  // Network-level errors
+  if (error) {
+    if (/abort|timeout/i.test(error)) return 'Timeout';
+    if (/ssl|certificate|cert|tls/i.test(error)) return 'SSL Error';
+    if (/dns|getaddr|notfound|enotfound|name_not_resolved/i.test(error)) return 'DNS Error';
+    if (/refused|econnrefused/i.test(error)) return 'Down';
+    if (/network|failed to fetch|cors/i.test(error)) return 'Unknown';
+    return 'Down';
+  }
+
+  if (!httpCode || httpCode === 0) return 'Unknown';
+
+  // Cloudflare WAF blocking = site IS up, just protected
+  if (isCloudflare && CF_SIGNATURE_CODES.has(httpCode)) return 'Working';
+
+  // Explicit WORKING codes
+  if (WORKING_CODES.has(httpCode)) {
+    if (REDIRECT_CODES.has(httpCode)) return 'Redirect';
+    return 'Working';
+  }
+
+  // 200-403 safety net (handles unusual 2xx/4xx responses)
+  if (httpCode >= 200 && httpCode <= 403) {
+    if (httpCode >= 301 && httpCode <= 308) return 'Redirect';
+    return 'Working';
+  }
+
+  // 404/410 = genuinely missing
+  if (httpCode === 404 || httpCode === 410) return 'Down';
+
+  // 405–499 = server responded, method/request issue, server IS running
+  if (httpCode >= 405 && httpCode < 500) return 'Working';
+
+  // 5xx: If Cloudflare origin error, mark as Down; otherwise Down too
+  if (httpCode >= 500) return 'Down';
+
+  return 'Unknown';
+}
+
+// ═══════════════════════════════════════════════════════════
+// CORS PROXY POOL — tried in round-robin with fallback
+// ═══════════════════════════════════════════════════════════
+const PROXY_POOL = [
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  (url) => `https://cors-anywhere.herokuapp.com/${url}`,
+];
+
+// Tracks which proxy index to start with for load distribution
+let proxyRoundRobin = 0;
+
+function getProxyOrder() {
+  const start = proxyRoundRobin % PROXY_POOL.length;
+  proxyRoundRobin++;
+  // Return proxies starting from current round-robin position
+  return [
+    ...PROXY_POOL.slice(start),
+    ...PROXY_POOL.slice(0, start)
+  ];
+}
+
+// ═══════════════════════════════════════════════════════════
+// CORE URL CHECKER — Multi-phase with smart retry
+// ═══════════════════════════════════════════════════════════
+async function checkUrlBrowser(entry, timeoutMs, maxRetries) {
+  const isEnterprise = isEnterpriseDomain(entry.url);
+  // Enterprise domains get extra timeout allowance
+  const effectiveTimeout = isEnterprise ? Math.max(timeoutMs, 20000) : timeoutMs;
+
+  let lastResult = {
+    status: 'Unknown', httpCode: 0, responseTime: 0,
+    errorMessage: '', details: '', checkedAt: new Date().toLocaleString()
+  };
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    if (shouldStop) break;
+
+    // Exponential backoff between retries
+    if (attempt > 1) {
+      const backoff = Math.min(1000 * Math.pow(1.5, attempt - 1), 4000);
+      addLog(`⟳ Retry ${attempt}/${maxRetries}: ${entry.url} (wait ${Math.round(backoff)}ms)`, 'warn');
+      await sleep(backoff);
+    }
+
+    const result = await singleCheck(entry.url, effectiveTimeout, attempt);
+    lastResult = { ...result, checkedAt: new Date().toLocaleString() };
+
+    // If we got a definitive result, stop retrying
+    if (['Working', 'Redirect', 'Down', 'SSL Error', 'DNS Error'].includes(result.status)) {
+      break;
+    }
+
+    // For timeouts on enterprise domains, try once more with longer wait
+    if (result.status === 'Timeout' && attempt < maxRetries) {
+      continue;
+    }
+  }
+
+  return { ...entry, ...lastResult };
+}
+
+async function singleCheck(url, timeoutMs, attempt) {
+  const start = performance.now();
+
+  // ── PHASE 1: Direct no-cors fetch (fastest, detects Cloudflare opaque) ──
+  try {
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), Math.min(timeoutMs, 8000));
+
+    const resp = await fetch(url, {
+      method: 'HEAD',
+      mode: 'no-cors',
+      cache: 'no-store',
+      credentials: 'omit',
+      signal: ctrl.signal,
+      headers: { 'Accept': 'text/html,application/xhtml+xml,*/*' }
+    });
+    clearTimeout(timer);
+
+    const elapsed = Math.round(performance.now() - start);
+
+    // Opaque = CORS blocked but server DID respond — REACHABLE
+    if (resp.type === 'opaque' || resp.type === 'opaqueredirect') {
+      return {
+        status: 'Working', httpCode: 0, responseTime: elapsed,
+        errorMessage: '', details: 'Reachable (CORS protected — opaque response)'
+      };
+    }
+
+    // Transparent response (same-origin or permissive CORS)
+    if (resp.status > 0) {
+      const isRedirect = REDIRECT_CODES.has(resp.status);
+      const status = classifyResult({ httpCode: resp.status });
+      return {
+        status, httpCode: resp.status, responseTime: elapsed,
+        errorMessage: status === 'Down' ? `HTTP ${resp.status}` : '',
+        details: isRedirect ? `Redirects (HTTP ${resp.status})` : ''
+      };
+    }
+  } catch (err) {
+    const elapsed = Math.round(performance.now() - start);
+    const msg = (err.message || '').toLowerCase();
+
+    if (err.name === 'AbortError') {
+      return { status: 'Timeout', httpCode: 0, responseTime: elapsed,
+               errorMessage: `Timed out after ${timeoutMs/1000}s`, details: '' };
+    }
+
+    // SSL errors — definitive, no need to try proxy
+    if (/ssl|certificate|cert_|err_cert/i.test(msg)) {
+      return { status: 'SSL Error', httpCode: 0, responseTime: elapsed,
+               errorMessage: 'SSL certificate error', details: '' };
+    }
+
+    // DNS errors — definitive
+    if (/getaddr|notfound|enotfound|name_not_resolved|err_name/i.test(msg)) {
+      return { status: 'DNS Error', httpCode: 0, responseTime: elapsed,
+               errorMessage: 'DNS resolution failed', details: '' };
+    }
+    // Network errors fall through to proxy phase
+  }
+
+  // ── PHASE 2: CORS proxy pool (gets actual HTTP status codes) ──
+  const proxies = getProxyOrder();
+  let proxyAttempts = Math.min(attempt <= 1 ? 2 : 3, proxies.length); // try more proxies on retries
+
+  for (let pi = 0; pi < proxyAttempts; pi++) {
+    if (shouldStop) break;
+    const proxyFn  = proxies[pi];
+    const proxyUrl = proxyFn(url);
+    const pStart   = performance.now();
+    const ctrl     = new AbortController();
+    const timer    = setTimeout(() => ctrl.abort(), timeoutMs + 8000);
+
+    try {
+      const resp = await fetch(proxyUrl, {
+        signal: ctrl.signal,
+        cache: 'no-store',
+        headers: { 'Accept': 'text/html,*/*' }
+      });
+      clearTimeout(timer);
+      const elapsed = Math.round(performance.now() - pStart);
+
+      // Check for Cloudflare headers in proxy response
+      const cfHeader = resp.headers.get('x-final-url') || resp.headers.get('content-type') || '';
+      const isCloudflare = false; // Proxies strip headers; rely on status code patterns
+
+      // allorigins returns proxy's own 200 even for 404 targets — check content if possible
+      const proxyCode = resp.status;
+
+      if (!resp.ok && proxyCode >= 400) {
+        // Proxy itself errored (not the target) — try next proxy
+        continue;
+      }
+
+      // Proxy succeeded — treat as reachable
+      // For allorigins, a proxy 200 means target was fetched successfully
+      if (resp.ok) {
+        // Try to read response to detect cloudflare challenge pages
+        let bodyText = '';
+        try {
+          bodyText = await resp.text();
+        } catch { /* ignore */ }
+
+        const isCloudflareChallenge = /cloudflare|cf-chl|cf_clearance|ray id/i.test(bodyText.substring(0, 2000));
+        const isActuallyDown = /404 not found|page not found|error 404/i.test(bodyText.substring(0, 500));
+
+        if (isActuallyDown) {
+          return { status: 'Down', httpCode: 404, responseTime: elapsed,
+                   errorMessage: 'Page not found (404)', details: '' };
+        }
+
+        if (isCloudflareChallenge) {
+          return { status: 'Working', httpCode: 403, responseTime: elapsed,
+                   errorMessage: '', details: 'Cloudflare protected — challenge page detected' };
+        }
+
+        return { status: 'Working', httpCode: proxyCode, responseTime: elapsed,
+                 errorMessage: '', details: `Via proxy [${pi + 1}]` };
+      }
+
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') {
+        // This proxy timed out — try next
+        continue;
+      }
+      // Other proxy error — try next
+    }
+  }
+
+  // ── PHASE 3: Image probe (last resort — works for image hosts, detects connectivity) ──
+  try {
+    const imgResult = await imageProbe(url, Math.min(timeoutMs, 6000));
+    if (imgResult.reachable) {
+      return { status: 'Working', httpCode: 0, responseTime: imgResult.elapsed,
+               errorMessage: '', details: 'Reachable (image probe)' };
+    }
+  } catch { /* ignore */ }
+
+  // All phases exhausted — return unknown/down
+  const totalElapsed = Math.round(performance.now() - startTime);
+  return {
+    status: 'Unknown', httpCode: 0, responseTime: 0,
+    errorMessage: 'All validation methods failed — result uncertain',
+    details: 'Consider manual verification'
+  };
+}
+
+// Image probe: loads favicon or root as image — detects basic reachability
+function imageProbe(url, timeoutMs) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const done = (reachable, elapsed) => {
+      if (!resolved) { resolved = true; resolve({ reachable, elapsed }); }
+    };
+
+    try {
+      const start  = performance.now();
+      const origin = new URL(url).origin;
+      const img    = new Image();
+      const timer  = setTimeout(() => { img.src = ''; done(false, timeoutMs); }, timeoutMs);
+
+      img.onload  = () => { clearTimeout(timer); done(true, Math.round(performance.now() - start)); };
+      img.onerror = (e) => {
+        clearTimeout(timer);
+        // onerror fires even for non-image URLs if server responded
+        // The key insight: if we got ANY response (even 404), server is up
+        const elapsed = Math.round(performance.now() - start);
+        // If it errored very quickly (<50ms), server likely refused
+        // If it took time, server probably responded
+        done(elapsed > 100, elapsed);
+      };
+      img.src = `${origin}/favicon.ico?_=${Date.now()}`;
+    } catch {
+      resolve({ reachable: false, elapsed: 0 });
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILE HANDLING
+// ═══════════════════════════════════════════════════════════
+document.getElementById('file-input').addEventListener('change', handleFileUpload);
+
+const uploadZone = document.getElementById('upload-zone');
+uploadZone.addEventListener('dragover',  (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', ()  => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (file) processFile(file);
+}
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data     = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet    = workbook.Sheets[workbook.SheetNames[0]];
+      const rows     = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      if (rows.length === 0) { showToast('No data found in file.', 'error'); return; }
+
+      const cols    = Object.keys(rows[0]);
+      const findCol = (kws) => cols.find(c => kws.some(k => c.toLowerCase().includes(k.toLowerCase()))) || '';
+
+      const clCol   = findCol(['cl name', 'client name', 'client', 'cl']);
+      const zoneCol = findCol(['zone', 'near zone', 'region', 'location', 'area']);
+      const urlCol  = findCol(['url', 'link', 'address', 'website', 'http', 'site']);
+
+      if (!urlCol) { showToast('Could not find a URL column. Ensure your Excel has a "URL" column.', 'error'); return; }
+
+      urlQueue = rows
+        .map((row, i) => ({
+          id:       i + 1,
+          clName:   String(row[clCol]   || '').trim(),
+          nearZone: String(row[zoneCol] || '').trim(),
+          url:      cleanUrl(String(row[urlCol] || '').trim()),
+          source:   'excel'
+        }))
+        .filter(r => r.url && r.url.startsWith('http'));
+
+      document.getElementById('file-loaded').style.display = 'block';
+      document.getElementById('file-name').textContent    = file.name;
+      document.getElementById('file-rows').textContent    = urlQueue.length;
+      updateDashboard();
+      addLog(`📁 Loaded ${urlQueue.length} URLs from "${file.name}"`, 'info');
+      showToast(`✓ Loaded ${urlQueue.length} URLs from Excel`, 'success');
+    } catch(err) {
+      showToast('Error reading file: ' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function cleanUrl(url) {
+  if (!url) return '';
+  url = url.trim();
+  // Strip wrapping quotes
+  url = url.replace(/^["']|["']$/g, '');
+  if (!url.match(/^https?:\/\//)) url = 'https://' + url;
+  // Basic URL cleanup
+  try { return new URL(url).toString(); } catch { return url; }
+}
+
+function clearFile() {
+  urlQueue = [];
+  document.getElementById('file-input').value  = '';
+  document.getElementById('file-loaded').style.display = 'none';
+  updateDashboard();
+}
+
+// ═══════════════════════════════════════════════════════════
+// SAMPLE EXCEL DOWNLOAD
+// ═══════════════════════════════════════════════════════════
+function downloadSampleExcel() {
+  const data = [
+    { 'CL Name': 'Client Alpha',   'Near Zone Name': 'North Zone', 'URL': 'https://google.com' },
+    { 'CL Name': 'Client Beta',    'Near Zone Name': 'South Zone', 'URL': 'https://github.com' },
+    { 'CL Name': 'Client Gamma',   'Near Zone Name': 'East Zone',  'URL': 'https://stackoverflow.com' },
+    { 'CL Name': 'Client Delta',   'Near Zone Name': 'West Zone',  'URL': 'https://httpstat.us/404' },
+    { 'CL Name': 'Client Epsilon', 'Near Zone Name': 'Central',    'URL': 'https://httpstat.us/500' },
+    { 'CL Name': 'CF Protected',   'Near Zone Name': 'North Zone', 'URL': 'https://cloudflare.com' },
+    { 'CL Name': 'Enterprise',     'Near Zone Name': 'East Zone',  'URL': 'https://portal.example.com' },
+    { 'CL Name': 'Client Eta',     'Near Zone Name': 'South Zone', 'URL': 'https://wikipedia.org' },
+  ];
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 45 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'URLs');
+  XLSX.writeFile(wb, 'sample_urls.xlsx');
+  showToast('Sample Excel downloaded!', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN RUNNER
+// ═══════════════════════════════════════════════════════════
+async function startChecking() {
+  const pastedText = document.getElementById('url-textarea').value.trim();
+  const pastedUrls = pastedText
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 5 && l.includes('.'))
+    .map((u, i) => ({ id: 9000 + i, clName: '', nearZone: '', url: cleanUrl(u), source: 'pasted' }))
+    .filter(r => r.url.startsWith('http'));
+
+  const allUrls = [...urlQueue, ...pastedUrls];
+
+  if (allUrls.length === 0) {
+    showToast('Please upload an Excel file or paste some URLs first!', 'warning');
+    return;
+  }
+
+  // Reset
+  results    = [];
+  isRunning  = true;
+  shouldStop = false;
+  startTime  = Date.now();
+
+  document.getElementById('start-btn').disabled              = true;
+  document.getElementById('stop-btn').style.display          = 'flex';
+  document.getElementById('download-btn').style.display      = 'none';
+  document.getElementById('progress-section').style.display  = 'block';
+  document.getElementById('results-section').style.display   = 'block';
+  document.getElementById('log-section').style.display       = 'block';
+  document.getElementById('results-tbody').innerHTML         = '';
+
+  updateProgress(0, allUrls.length);
+  updateDashboard();
+  addLog(`🚀 Starting check for ${allUrls.length} URLs (browser-only mode)`, 'info');
+  addLog(`ℹ Cloudflare-protected sites auto-detected · Opaque responses → WORKING`, 'info');
+
+  const concurrency = parseInt(document.getElementById('concurrency-select').value);
+  const timeoutMs   = (parseInt(document.getElementById('timeout-input').value) || 15) * 1000;
+  const maxRetries  = parseInt(document.getElementById('retry-select').value) || 2;
+
+  // Stable parallel batching — avoids overwhelming browser/proxies
+  for (let i = 0; i < allUrls.length; i += concurrency) {
+    if (shouldStop) { addLog('⛔ Stopped by user.', 'warn'); break; }
+
+    const batch = allUrls.slice(i, i + concurrency);
+
+    // Show batch as "checking" in table
+    batch.forEach(entry => {
+      if (!document.getElementById(`row-${entry.id}`)) {
+        appendRow({ ...entry, status: 'Checking', httpCode: '', responseTime: '', errorMessage: '', details: '', checkedAt: '' }, true);
+      }
+    });
+
+    document.getElementById('current-url').textContent = batch[0].url + (batch.length > 1 ? ` (+${batch.length - 1} more)` : '');
+
+    // Run batch in parallel with independent error handling per URL
+    const batchResults = await Promise.allSettled(
+      batch.map(entry => checkUrlBrowser(entry, timeoutMs, maxRetries))
+    );
+
+    batchResults.forEach((settled, idx) => {
+      let res;
+      if (settled.status === 'fulfilled') {
+        res = settled.value;
+      } else {
+        // Promise itself rejected (shouldn't happen but safeguard)
+        res = {
+          ...batch[idx],
+          status: 'Unknown', httpCode: 0, responseTime: 0,
+          errorMessage: 'Internal check error: ' + (settled.reason?.message || 'unknown'),
+          details: '', checkedAt: new Date().toLocaleString()
+        };
+      }
+
+      results.push(res);
+      updateRow(res);
+      logResult(res);
+    });
+
+    const done = Math.min(i + concurrency, allUrls.length);
+    updateProgress(done, allUrls.length);
+    updateDashboard();
+
+    // Small breathing room between batches to avoid proxy rate-limits
+    if (i + concurrency < allUrls.length) await sleep(150);
+  }
+
+  finishChecking(allUrls.length);
+}
+
+function finishChecking(total) {
+  isRunning = false;
+  document.getElementById('start-btn').disabled          = false;
+  document.getElementById('stop-btn').style.display      = 'none';
+  document.getElementById('download-btn').style.display  = 'flex';
+  document.getElementById('current-url').textContent     = `✓ Completed ${results.length} URLs`;
+  document.getElementById('progress-pct').textContent    = '100%';
+  document.getElementById('progress-bar').style.width    = '100%';
+
+  const working  = results.filter(r => isWorking(r.status)).length;
+  const failed   = results.filter(r => isFailed(r.status)).length;
+  const unknowns = results.filter(r => r.status === 'Unknown').length;
+
+  addLog(`✅ Done! ${working} working · ${failed} failed · ${unknowns} uncertain`, 'ok');
+  showToast(`✓ Checked ${results.length} URLs — ${working} working, ${failed} issues`, 'success');
+  updateDashboard();
+}
+
+function stopChecking() {
+  shouldStop = true;
+  showToast('Stopping after current batch...', 'warning');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Status helpers
+function isWorking(s) { return ['Working', 'Redirect'].includes(s); }
+function isFailed(s)  { return ['Down', 'Failed', 'Error', 'DNS Error'].includes(s); }
+
+// ═══════════════════════════════════════════════════════════
+// UI UPDATES
+// ═══════════════════════════════════════════════════════════
+function updateProgress(done, total) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progress-bar').style.width  = pct + '%';
+  document.getElementById('progress-pct').textContent  = pct + '%';
+  document.getElementById('stat-total').textContent    = total;
+  document.getElementById('stat-done').textContent     = done;
+  document.getElementById('stat-ok').textContent       = results.filter(r => isWorking(r.status)).length;
+  document.getElementById('stat-fail').textContent     = results.filter(r => isFailed(r.status)).length;
+  document.getElementById('stat-slow').textContent     = results.filter(r => r.status === 'Timeout').length;
+  document.getElementById('stat-redirect').textContent = results.filter(r => r.status === 'Redirect').length;
+
+  if (done > 0 && startTime) {
+    const elapsed   = (Date.now() - startTime) / 1000;
+    const rate      = done / elapsed;
+    const remaining = (total - done) / rate;
+    document.getElementById('stat-eta').textContent = remaining > 0 ? `${Math.round(remaining)}s` : '—';
+  }
+}
+
+function updateDashboard() {
+  const total = results.length || urlQueue.length;
+  document.getElementById('dash-total').textContent   = total;
+  document.getElementById('dash-working').textContent = results.filter(r => isWorking(r.status)).length;
+  document.getElementById('dash-failed').textContent  = results.filter(r => isFailed(r.status)).length;
+  document.getElementById('dash-timeout').textContent = results.filter(r => r.status === 'Timeout').length;
+  document.getElementById('dash-other').textContent   = results.filter(r =>
+    ['Redirect', 'SSL Error', 'DNS Error', 'Unknown'].includes(r.status)).length;
+}
+
+function appendRow(res, isPlaceholder = false) {
+  const tbody = document.getElementById('results-tbody');
+  const tr    = document.createElement('tr');
+  tr.id       = `row-${res.id}`;
+  if (!isPlaceholder) tr.className = getRowClass(res.status);
+  tr.dataset.status = (res.status || '').toLowerCase();
+  tr.innerHTML      = buildRowHTML(res);
+  tbody.appendChild(tr);
+}
+
+function updateRow(res) {
+  const tr = document.getElementById(`row-${res.id}`);
+  if (tr) {
+    tr.className      = getRowClass(res.status);
+    tr.dataset.status = (res.status || '').toLowerCase();
+    tr.innerHTML      = buildRowHTML(res);
+  } else {
+    appendRow(res);
+  }
+}
+
+function buildRowHTML(res) {
+  const statusSlug  = (res.status || 'unknown').toLowerCase().replace(/ /g, '-');
+  const statusBadge = `<span class="status-badge status-${statusSlug}">${getStatusIcon(res.status)} ${res.status}</span>`;
+
+  const codeNum   = parseInt(res.httpCode) || 0;
+  const codeClass = codeNum ? `code-${Math.floor(codeNum / 100)}xx` : 'code-0';
+  const httpCode  = codeNum
+    ? `<span class="http-code ${codeClass}">${codeNum}</span>`
+    : `<span style="color:var(--text-dimmer)">—</span>`;
+
+  const rt        = parseInt(res.responseTime) || 0;
+  const timeClass = rt < 500 ? 'time-fast' : rt < 2000 ? 'time-medium' : 'time-slow';
+  const respTime  = rt ? `<span class="response-time ${timeClass}">${rt}ms</span>` : '—';
+
+  let healthBadge;
+  if (res.status === 'Checking') {
+    healthBadge = `<span style="color:var(--accent);font-size:11px">⟳ Checking</span>`;
+  } else if (isWorking(res.status)) {
+    healthBadge = `<span style="background:rgba(0,200,122,0.15);color:var(--green);border:1px solid rgba(0,200,122,0.3);padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:0.5px">● HEALTHY</span>`;
+  } else if (res.status === 'Timeout') {
+    healthBadge = `<span style="background:rgba(255,184,48,0.12);color:var(--yellow);border:1px solid rgba(255,184,48,0.3);padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:0.5px">⏱ TIMEOUT</span>`;
+  } else if (res.status === 'Unknown') {
+    healthBadge = `<span style="background:rgba(100,100,120,0.15);color:var(--text-dim);border:1px solid var(--border);padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:0.5px">? UNCERTAIN</span>`;
+  } else {
+    healthBadge = `<span style="background:rgba(255,69,96,0.15);color:var(--red);border:1px solid rgba(255,69,96,0.3);padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:0.5px">✗ UNHEALTHY</span>`;
+  }
+
+  const detailsText = res.details || res.errorMessage || '';
+
+  return `
+    <td style="color:var(--text-dimmer);font-size:11px">${res.id}</td>
+    <td class="td-name">${escHtml(res.clName) || '<span style="color:var(--text-dimmer)">—</span>'}</td>
+    <td style="color:var(--text-dim)">${escHtml(res.nearZone) || '<span style="color:var(--text-dimmer)">—</span>'}</td>
+    <td class="td-url" title="${escHtml(res.url)}"><a href="${escHtml(res.url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;font-size:11px">${escHtml(res.url)}</a></td>
+    <td>${statusBadge}</td>
+    <td>${httpCode}</td>
+    <td>${respTime}</td>
+    <td style="color:var(--text-dim);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(detailsText)}">${escHtml(detailsText)}</td>
+    <td>${healthBadge}</td>
+    <td style="color:var(--text-dimmer);font-size:11px;white-space:nowrap">${res.checkedAt || ''}</td>
+  `;
+}
+
+function getRowClass(status) {
+  if (isWorking(status)) return 'row-working';
+  if (status === 'Timeout') return 'row-timeout';
+  if (status === 'Redirect') return 'row-redirect';
+  if (isFailed(status)) return 'row-failed';
+  return '';
+}
+
+function getStatusIcon(status) {
+  const icons = {
+    'Working':'✓', 'Redirect':'↪', 'Down':'✗', 'Timeout':'⏱',
+    'SSL Error':'🔒', 'DNS Error':'🌐', 'Error':'✗', 'Checking':'⟳',
+    'Unknown':'?', 'Failed':'✗', 'Reachable':'✓'
+  };
+  return icons[status] || '?';
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILTER
+// ═══════════════════════════════════════════════════════════
+function filterTable(filter, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#results-tbody tr').forEach(tr => {
+    const s = (tr.dataset.status || '').toLowerCase();
+    if (filter === 'all')      { tr.style.display = ''; return; }
+    if (filter === 'working')  { tr.style.display = ['working','redirect'].includes(s) ? '' : 'none'; return; }
+    if (filter === 'failed')   { tr.style.display = ['down','failed','error','dns error'].includes(s) ? '' : 'none'; return; }
+    if (filter === 'timeout')  { tr.style.display = s === 'timeout' ? '' : 'none'; return; }
+    if (filter === 'redirect') { tr.style.display = s === 'redirect' ? '' : 'none'; return; }
+    if (filter === 'error')    { tr.style.display = ['ssl error','dns error','unknown'].includes(s) ? '' : 'none'; return; }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════════════════
+function addLog(msg, type = 'info') {
+  const container = document.getElementById('log-container');
+  const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const line = document.createElement('span');
+  line.className = `log-line log-${type}`;
+  line.innerHTML = `<span class="log-time">${time}</span>${escHtml(msg)}`;
+  container.appendChild(line);
+  container.scrollTop = container.scrollHeight;
+}
+
+function logResult(res) {
+  const icon = isWorking(res.status) ? '✓' : res.status === 'Timeout' ? '⏱' : '✗';
+  const type = isWorking(res.status) ? 'ok' : res.status === 'Timeout' ? 'warn' : 'err';
+  const code = res.httpCode ? ` HTTP ${res.httpCode}` : '';
+  const time = res.responseTime ? ` ${res.responseTime}ms` : '';
+  addLog(`${icon} [${res.status}] ${res.url}${code}${time}`, type);
+}
+
+function clearLog() { document.getElementById('log-container').innerHTML = ''; }
+
+// ═══════════════════════════════════════════════════════════
+// EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════
+function downloadReport() {
+  if (results.length === 0) { showToast('No results to download yet.', 'warning'); return; }
+
+  const wb   = XLSX.utils.book_new();
+  const data = results.map(r => ({
+    'CL Name':            r.clName || '',
+    'Near Zone Name':     r.nearZone || '',
+    'URL':                r.url,
+    'Status':             r.status,
+    'Health':             isWorking(r.status) ? 'HEALTHY' : r.status === 'Timeout' ? 'TIMEOUT' : r.status === 'Unknown' ? 'UNCERTAIN' : 'UNHEALTHY',
+    'HTTP Status Code':   r.httpCode || '',
+    'Response Time (ms)': r.responseTime || '',
+    'Details':            r.details || '',
+    'Error / Notes':      r.errorMessage || '',
+    'Checked Timestamp':  r.checkedAt || ''
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{ wch:20 },{ wch:20 },{ wch:50 },{ wch:14 },{ wch:12 },{ wch:16 },{ wch:18 },{ wch:35 },{ wch:35 },{ wch:22 }];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'URL Status Report');
+
+  const working  = results.filter(r => isWorking(r.status)).length;
+  const redirect = results.filter(r => r.status === 'Redirect').length;
+  const failed   = results.filter(r => isFailed(r.status)).length;
+  const timeout  = results.filter(r => r.status === 'Timeout').length;
+  const ssl      = results.filter(r => r.status === 'SSL Error').length;
+  const dns      = results.filter(r => r.status === 'DNS Error').length;
+  const unknown  = results.filter(r => r.status === 'Unknown').length;
+
+  const summaryData = [
+    { 'Metric': 'Total URLs Checked',     'Count': results.length, 'Percentage': '100%' },
+    { 'Metric': 'Working (incl. CF)',      'Count': working,        'Percentage': pct(working, results.length) },
+    { 'Metric': 'Redirects',              'Count': redirect,       'Percentage': pct(redirect, results.length) },
+    { 'Metric': 'Down / Failed',          'Count': failed,         'Percentage': pct(failed, results.length) },
+    { 'Metric': 'Timeout',                'Count': timeout,        'Percentage': pct(timeout, results.length) },
+    { 'Metric': 'SSL Error',              'Count': ssl,            'Percentage': pct(ssl, results.length) },
+    { 'Metric': 'DNS Error',              'Count': dns,            'Percentage': pct(dns, results.length) },
+    { 'Metric': 'Uncertain (verify manually)', 'Count': unknown,   'Percentage': pct(unknown, results.length) },
+    { 'Metric': '',                       'Count': '',             'Percentage': '' },
+    { 'Metric': 'Avg Response Time (ms)', 'Count': avgRt(),        'Percentage': '' },
+    { 'Metric': 'Generated At',           'Count': new Date().toLocaleString(), 'Percentage': '' },
+    { 'Metric': 'Note',                   'Count': 'Cloudflare-protected URLs returning opaque/403 marked as Working', 'Percentage': '' },
+  ];
+  const ws2 = XLSX.utils.json_to_sheet(summaryData);
+  ws2['!cols'] = [{ wch: 34 }, { wch: 16 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+  XLSX.writeFile(wb, `url_status_report_${timestamp}.xlsx`);
+  showToast('✓ Excel report downloaded!', 'success');
+  addLog(`📥 Report exported: url_status_report_${timestamp}.xlsx`, 'ok');
+}
+
+function pct(n, total) { return total ? Math.round(n / total * 100) + '%' : '0%'; }
+function avgRt() {
+  const times = results.filter(r => r.responseTime > 0).map(r => r.responseTime);
+  if (!times.length) return '—';
+  return Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+}
+
+// ═══════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════
+function clearAll() {
+  if (isRunning) { showToast('Please stop the check first.', 'warning'); return; }
+  results  = [];
+  urlQueue = [];
+  document.getElementById('results-tbody').innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">📡</div>No results yet. Upload a file or paste URLs and click Start Checking.</div></td></tr>';
+  document.getElementById('file-input').value                  = '';
+  document.getElementById('file-loaded').style.display         = 'none';
+  document.getElementById('url-textarea').value                = '';
+  document.getElementById('progress-section').style.display    = 'none';
+  document.getElementById('results-section').style.display     = 'none';
+  document.getElementById('log-section').style.display         = 'none';
+  document.getElementById('download-btn').style.display        = 'none';
+  document.getElementById('log-container').innerHTML           = '';
+  updateDashboard();
+  showToast('All cleared.', 'success');
+}
+
+let toastTimer;
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
